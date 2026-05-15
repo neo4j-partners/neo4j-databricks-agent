@@ -1,0 +1,90 @@
+bundle:
+  name: neo4j_databricks_agent
+
+resources:
+  experiments:
+    neo4j_agent_experiment:
+      name: "/Shared/neo4j-databricks-agent"
+
+  secret_scopes:
+    neo4j:
+      name: "neo4j"
+
+  apps:
+    neo4j_databricks_agent:
+      name: "neo4j-databricks-agent"
+      description: "Databricks Apps agent that answers questions using read-only Neo4j Cypher tools"
+      source_code_path: ./
+      config:
+        command: ["uv", "run", "start-app"]
+        env:
+          - name: MLFLOW_TRACKING_URI
+            value: "databricks"
+          - name: MLFLOW_REGISTRY_URI
+            value: "databricks-uc"
+          - name: API_PROXY
+            value: "http://localhost:8000/invocations"
+          - name: CHAT_APP_PORT
+            value: "3000"
+          - name: CHAT_PROXY_TIMEOUT_SECONDS
+            value: "300"
+          - name: NEO4J_MAX_ROWS
+            value: "25"
+          - name: DATABRICKS_AGENT_MODEL
+            value_from: "llm"
+          - name: MLFLOW_EXPERIMENT_ID
+            value_from: "experiment"
+          - name: NEO4J_URI
+            value_from: "neo4j_uri"
+          - name: NEO4J_USERNAME
+            value_from: "neo4j_username"
+          - name: NEO4J_PASSWORD
+            value_from: "neo4j_password"
+          - name: NEO4J_DATABASE
+            value_from: "neo4j_database"
+
+      resources:
+        - name: "experiment"
+          experiment:
+            experiment_id: "${resources.experiments.neo4j_agent_experiment.id}"
+            permission: "CAN_MANAGE"
+        - name: "llm"
+          serving_endpoint:
+            name: "databricks-claude-sonnet-4-5"
+            permission: "CAN_QUERY"
+        - name: "neo4j_uri"
+          secret:
+            scope: "neo4j"
+            key: "NEO4J_URI"
+            permission: "READ"
+        - name: "neo4j_username"
+          secret:
+            scope: "neo4j"
+            key: "NEO4J_USERNAME"
+            permission: "READ"
+        - name: "neo4j_password"
+          secret:
+            scope: "neo4j"
+            key: "NEO4J_PASSWORD"
+            permission: "READ"
+        - name: "neo4j_database"
+          secret:
+            scope: "neo4j"
+            key: "NEO4J_DATABASE"
+            permission: "READ"
+
+targets:
+  dev:
+    mode: development
+    default: true
+    workspace:
+      host: "https://dbc-de840360-1abb.cloud.databricks.com"
+
+  prod:
+    mode: production
+    workspace:
+      host: "https://dbc-de840360-1abb.cloud.databricks.com"
+    resources:
+      apps:
+        neo4j_databricks_agent:
+          name: "neo4j-databricks-agent"
