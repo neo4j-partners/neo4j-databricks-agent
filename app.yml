@@ -1,0 +1,27 @@
+command: ["uv", "run", "start-app"]
+
+env:
+  - name: MLFLOW_TRACKING_URI
+    value: "databricks"
+  - name: MLFLOW_REGISTRY_URI
+    value: "databricks-uc"
+  - name: API_PROXY
+    value: "http://localhost:8000/invocations"
+  - name: CHAT_APP_PORT
+    value: "3000"
+  - name: CHAT_PROXY_TIMEOUT_SECONDS
+    value: "300"
+  - name: NEO4J_MAX_ROWS
+    value: "25"
+  - name: DATABRICKS_AGENT_MODEL
+    valueFrom: "llm"
+  - name: MLFLOW_EXPERIMENT_ID
+    valueFrom: "experiment"
+  - name: NEO4J_URI
+    valueFrom: "neo4j_uri"
+  - name: NEO4J_USERNAME
+    valueFrom: "neo4j_username"
+  - name: NEO4J_PASSWORD
+    valueFrom: "neo4j_password"
+  - name: NEO4J_DATABASE
+    valueFrom: "neo4j_database"
