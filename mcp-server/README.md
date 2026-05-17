@@ -2,8 +2,18 @@
 
 A custom **[FastMCP](https://gofastmcp.com/)**-based MCP server that exposes
 read-only Cypher and schema-introspection tools over a Neo4j Aura instance,
-wrapped in a FastAPI parent so the app has a real landing page on `/` and a
+wrapped in a Starlette parent so the app has a real landing page on `/` and a
 health endpoint — friendlier for demos than the bare PyPI `mcp-neo4j-cypher`.
+
+## In action
+
+Registered automatically in the workspace's **Agents > MCPs** registry by virtue of the `mcp-` name prefix:
+
+![Databricks Agents > MCPs registry showing mcp-neo4j-cypher as Active](../docs/images/mcp-registry-active.png)
+
+Selected as a tool in the Databricks Playground and called against the live graph:
+
+![Databricks Playground returning node-label counts from Neo4j via the MCP server](../docs/images/playground-tool-call.png)
 
 ## HTTP surface
 
@@ -11,7 +21,7 @@ health endpoint — friendlier for demos than the bare PyPI `mcp-neo4j-cypher`.
 |------|--------|---------|
 | `/` | `GET` | HTML landing page: server identity, tool catalog, sample request |
 | `/health` | `GET` | JSON `{"status": "healthy", ...}` for the Databricks Apps health probe |
-| `/mcp/` | `POST` | MCP Streamable HTTP transport (FastMCP) |
+| `/mcp/mcp` | `POST` | MCP Streamable HTTP transport (FastMCP). The Databricks Playground registers the app URL as the MCP base and appends `/mcp` to it, so the canonical endpoint is `/mcp/mcp`. |
 
 ## Tools
 
@@ -26,8 +36,8 @@ health endpoint — friendlier for demos than the bare PyPI `mcp-neo4j-cypher`.
 mcp-server/
 ├── app.yaml           # Databricks App command + NEO4J_* env mappings
 ├── landing.html       # HTML served at GET /
-├── requirements.txt   # fastmcp, fastapi, uvicorn, neo4j
-└── server.py          # FastMCP tools + FastAPI mount at /mcp/
+├── requirements.txt   # fastmcp, starlette, uvicorn, neo4j
+└── server.py          # FastMCP tools wrapped in a Starlette parent (/ , /health, /mcp/mcp)
 ```
 
 ## Runtime contract
@@ -65,11 +75,13 @@ curl -s -o /dev/null -w "GET /health  -> %{http_code}\n" -H "Authorization: Bear
 curl -sN -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
   -H "Accept: application/json,text/event-stream" \
-  "$URL/mcp/" -d '{
+  "$URL/mcp/mcp" -d '{
     "jsonrpc":"2.0","id":1,"method":"initialize",
     "params":{"protocolVersion":"2025-03-26","capabilities":{},
               "clientInfo":{"name":"smoke","version":"0.1"}}}'
 ```
+
+> The Databricks Apps MCP registry treats the app URL as the MCP base and appends `/mcp` to construct the protocol endpoint, so the canonical path is `/mcp/mcp` (not `/mcp/`). Local probes (curl, MCP Inspector) should also target `/mcp/mcp`.
 
 ## Registering as an MCP server in Databricks
 

@@ -300,16 +300,20 @@ This is **not** how the Supervisor API consumes UC functions (it uses `uc_functi
 
 ## Step 6 — Path C: Bundle a custom MCP server as a Databricks App
 
-> **Status: live in this repo.** The Neo4j Cypher MCP server is deployed as the Databricks App `mcp-neo4j-cypher` (URL: `https://mcp-neo4j-cypher-281440413997137.aws.databricksapps.com`, MCP endpoint at `/mcp/`). Source lives under [`mcp-server/`](../mcp-server/README.md). The agent app does **not** yet consume it — wire it in by following the steps below when you migrate to the Supervisor API.
+> **Status: live in this repo.** The Neo4j Cypher MCP server is deployed as the Databricks App `mcp-neo4j-cypher` (URL: `https://mcp-neo4j-cypher-281440413997137.aws.databricksapps.com`, MCP endpoint at `/mcp/mcp`). Source lives under [`mcp-server/`](../mcp-server/README.md). The agent app does **not** yet consume it — wire it in by following the steps below when you migrate to the Supervisor API.
 
 ### How `mcp-server/` is structured
 
 ```
 mcp-server/
-├── app.yaml          # mcp-neo4j-cypher CLI command + NEO4J_* env mappings
-├── requirements.txt  # mcp-neo4j-cypher==0.6.0
-└── README.md         # transport, smoke-test, consumption notes
+├── server.py          # FastMCP + Starlette: tools + landing + MCP mount
+├── landing.html       # HTML served on GET /
+├── app.yaml           # uvicorn command + NEO4J_* env mappings
+├── requirements.txt   # fastmcp, starlette, uvicorn, neo4j
+└── README.md          # surface contract, smoke test, consumption notes
 ```
+
+Why custom FastMCP instead of the upstream PyPI `mcp-neo4j-cypher` CLI: a real landing page on `/`, clean tool names without an upstream namespace prefix, a `/health` endpoint, and server-side read-only enforcement that's auditable in `server.py`.
 
 ### How it's wired in `databricks.yml`
 
@@ -323,18 +327,10 @@ resources:
       name: mcp-neo4j-cypher
       source_code_path: ./mcp-server
       config:
-        command: [
-          "mcp-neo4j-cypher",
-          "--transport", "http",
-          "--server-host", "0.0.0.0",
-          "--server-port", "$DATABRICKS_APP_PORT",
-          "--namespace", "neo4j",
-        ]
+        command: ["uvicorn", "server:app", "--host", "0.0.0.0", "--port", "$DATABRICKS_APP_PORT"]
         env:
-          - name: NEO4J_MCP_SERVER_PATH
-            value: "/mcp/"
-          - name: NEO4J_READ_ONLY
-            value: "true"
+          - name: NEO4J_MAX_ROWS
+            value: "50"
           - name: NEO4J_URI
             value_from: "neo4j_uri"
           - name: NEO4J_USERNAME
@@ -381,9 +377,11 @@ Any Databricks App with a name starting with `mcp-` is auto-listed in the worksp
 
 ### Smoke test (after deploy)
 
+The Databricks Apps MCP registry treats the app URL as the MCP base and appends `/mcp` to construct the protocol endpoint, so the canonical URL is `{app_url}/mcp/mcp`.
+
 ```bash
 TOKEN=$(databricks auth token --profile <profile> | jq -r .access_token)
-URL=https://mcp-neo4j-cypher-<workspace-id>.aws.databricksapps.com/mcp/
+URL=https://mcp-neo4j-cypher-<workspace-id>.aws.databricksapps.com/mcp/mcp
 
 # MCP initialize -> SSE response with server capabilities
 curl -sN -H "Authorization: Bearer $TOKEN" \
@@ -396,7 +394,7 @@ curl -sN -H "Authorization: Bearer $TOKEN" \
   }'
 ```
 
-Expected tools: `neo4j-get_neo4j_schema` (APOC-based) and `neo4j-read_neo4j_cypher` (read-only). Hosted MCP tools trigger the multi-turn approval flow (Step 8) unless you auto-approve client-side.
+Expected tools: `get_neo4j_schema` (APOC-based, falls back to native `db.labels()` / `db.relationshipTypes()` / `db.propertyKeys()`) and `read_neo4j_cypher` (read-only, single-statement validator). Hosted MCP tools trigger the multi-turn approval flow (Step 8) unless you auto-approve client-side.
 
 ---
 

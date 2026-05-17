@@ -123,14 +123,14 @@
       <div class="status-row">
         <span class="chip"><span class="dot"></span><strong>Running</strong></span>
         <span class="chip">Transport <strong>Streamable HTTP</strong></span>
-        <span class="chip">Endpoint <strong>POST /mcp/</strong></span>
+        <span class="chip">Endpoint <strong>POST /mcp/mcp</strong></span>
         <span class="chip">Mode <strong>read-only</strong></span>
         <span class="chip">Backend <strong>Neo4j Aura</strong></span>
       </div>
 
       <section>
         <h2>This page is not the API</h2>
-        <p>You're looking at a server, not a website. The browser-visible <code>/</code> exists so demos don't see a bare <code>404</code>. The actual protocol surface is <code>POST /mcp/</code>, consumed by MCP-aware clients: the Databricks Supervisor API, Claude Desktop, Cursor, custom agents, etc.</p>
+        <p>You're looking at a server, not a website. The browser-visible <code>/</code> exists so demos don't see a bare <code>404</code>. The actual protocol surface is <code>POST /mcp/mcp</code> — the Databricks Apps MCP registry treats the app URL as the MCP base and appends <code>/mcp</code> to construct the protocol endpoint, so the canonical URL ends in <code>/mcp/mcp</code>. Consumed by MCP-aware clients: the Databricks Supervisor API, Claude Desktop, Cursor, custom agents, etc.</p>
       </section>
 
       <section>
@@ -148,7 +148,7 @@
       <section>
         <h2>Try it (terminal)</h2>
         <pre><code>TOKEN=$(databricks auth token --profile &lt;profile&gt; | jq -r .access_token)
-URL=https://&lt;this-app&gt;/mcp/
+URL=https://&lt;this-app&gt;/mcp/mcp
 
 # MCP initialize -&gt; SSE response with server capabilities
 curl -sN -H "Authorization: Bearer $TOKEN" \
