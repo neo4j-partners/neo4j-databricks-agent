@@ -9,6 +9,8 @@ resources:
   secret_scopes:
     neo4j:
       name: "neo4j"
+    mcp_neo4j:
+      name: "mcp-neo4j"
 
   apps:
     neo4j_databricks_agent:
@@ -73,6 +75,54 @@ resources:
             key: "NEO4J_DATABASE"
             permission: "READ"
 
+    mcp_neo4j_cypher:
+      name: "mcp-neo4j-cypher"
+      description: "Self-hosted mcp-neo4j-cypher MCP server (read-only Cypher tools) for Neo4j Aura"
+      source_code_path: ./mcp-server
+      config:
+        command: [
+          "mcp-neo4j-cypher",
+          "--transport", "http",
+          "--server-host", "0.0.0.0",
+          "--server-port", "$DATABRICKS_APP_PORT",
+          "--namespace", "neo4j",
+        ]
+        env:
+          - name: NEO4J_MCP_SERVER_PATH
+            value: "/mcp/"
+          - name: NEO4J_READ_ONLY
+            value: "true"
+          - name: NEO4J_URI
+            value_from: "neo4j_uri"
+          - name: NEO4J_USERNAME
+            value_from: "neo4j_username"
+          - name: NEO4J_PASSWORD
+            value_from: "neo4j_password"
+          - name: NEO4J_DATABASE
+            value_from: "neo4j_database"
+
+      resources:
+        - name: "neo4j_uri"
+          secret:
+            scope: "mcp-neo4j"
+            key: "neo4j_uri"
+            permission: "READ"
+        - name: "neo4j_username"
+          secret:
+            scope: "mcp-neo4j"
+            key: "neo4j_username"
+            permission: "READ"
+        - name: "neo4j_password"
+          secret:
+            scope: "mcp-neo4j"
+            key: "neo4j_password"
+            permission: "READ"
+        - name: "neo4j_database"
+          secret:
+            scope: "mcp-neo4j"
+            key: "neo4j_database"
+            permission: "READ"
+
 targets:
   dev:
     mode: development
@@ -88,3 +138,5 @@ targets:
       apps:
         neo4j_databricks_agent:
           name: "neo4j-databricks-agent"
+        mcp_neo4j_cypher:
+          name: "mcp-neo4j-cypher"
