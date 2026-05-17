@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Neo4j Graph Agent</title>
+    <link rel="icon" href="data:," />
+    <link rel="stylesheet" href="/static/styles.css" />
+  </head>
+  <body>
+    <header class="topbar">
+      <div class="brand">
+        <span class="dot"></span>
+        <span class="title">Neo4j Graph Agent</span>
+      </div>
+      <div class="meta" id="meta">
+        <span id="status" class="status">checking…</span>
+        <button id="reset" class="btn-ghost" type="button">New chat</button>
+      </div>
+    </header>
+
+    <main class="main">
+      <section id="transcript" class="transcript" aria-live="polite"></section>
+
+      <form id="composer" class="composer" autocomplete="off">
+        <textarea
+          id="input"
+          class="input"
+          rows="2"
+          placeholder="Ask a question about the graph. e.g. What labels exist in the database?"
+          required
+        ></textarea>
+        <button id="send" class="btn-primary" type="submit">Send</button>
+      </form>
+
+      <p class="footnote">
+        Powered by an MLflow ResponsesAgent on Databricks Apps. Read-only Cypher only.
+      </p>
+    </main>
+
+    <script src="/static/app.js" defer></script>
+  </body>
+</html>
