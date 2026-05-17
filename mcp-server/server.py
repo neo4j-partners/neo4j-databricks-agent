@@ -3,7 +3,10 @@
 Surface:
 - GET  /         -> HTML landing page (server identity, tool catalog, sample request)
 - GET  /health   -> 200 JSON, for the Databricks Apps health probe
-- POST /mcp/     -> MCP Streamable HTTP transport (FastMCP)
+- POST /mcp      -> MCP Streamable HTTP transport (FastMCP)
+
+The Databricks Apps MCP registry convention is `{app_url}/mcp`, so the MCP
+endpoint lives at the root path `/mcp` (not `/mcp/<something>`).
 
 The MCP layer exposes two read-only tools backed by a single Neo4j Aura
 instance read from the standard NEO4J_* environment variables (mapped from
@@ -12,21 +15,21 @@ the `mcp-neo4j` Databricks secret scope).
 
 from __future__ import annotations
 
-import json
 import logging
 import os
 import re
-from contextlib import asynccontextmanager
 from functools import lru_cache
 from pathlib import Path
 from typing import Any
 
-from fastapi import FastAPI
-from fastapi.responses import HTMLResponse, JSONResponse
 from fastmcp import FastMCP
 from neo4j import GraphDatabase
 from neo4j.graph import Node, Path as Neo4jPath, Relationship
 from neo4j.time import Date, DateTime, Duration, Time
+from starlette.applications import Starlette
+from starlette.requests import Request
+from starlette.responses import HTMLResponse, JSONResponse
+from starlette.routing import Mount, Route
 
 logger = logging.getLogger("mcp-neo4j-cypher")
 logging.getLogger("neo4j").setLevel(logging.WARNING)
@@ -196,38 +199,32 @@ def read_neo4j_cypher(
 
 
 # ---------------------------------------------------------------------------
-# FastAPI parent with landing page + health, MCP mounted at /mcp/
+# Starlette parent: landing on /, health on /health, MCP at /mcp.
+# The Databricks Apps MCP registry hits {app_url}/mcp, so the FastMCP ASGI
+# app is configured to serve its endpoint at path="/mcp" and then mounted
+# at the Starlette root.
 # ---------------------------------------------------------------------------
 
-mcp_app = mcp.http_app(path="/")
+mcp_app = mcp.http_app(path="/mcp")
 LANDING_HTML = (Path(__file__).parent / "landing.html").read_text(encoding="utf-8")
 
 
-@asynccontextmanager
-async def lifespan(api: FastAPI):
-    """Forward the FastMCP lifespan so the session manager initializes."""
-    async with mcp_app.lifespan(api):
-        yield
-
-
-app = FastAPI(
-    title="Neo4j Cypher MCP server",
-    description="Read-only Cypher and Neo4j schema tools over MCP. Served on Databricks Apps.",
-    lifespan=lifespan,
-    docs_url=None,
-    redoc_url=None,
-    openapi_url=None,
-)
-
-
-@app.get("/", include_in_schema=False)
-async def landing() -> HTMLResponse:
+async def landing(request: Request) -> HTMLResponse:
     return HTMLResponse(LANDING_HTML)
 
 
-@app.get("/health", include_in_schema=False)
-async def health() -> JSONResponse:
-    return JSONResponse({"status": "healthy", "server": "neo4j-cypher", "transport": "streamable-http"})
+async def health(request: Request) -> JSONResponse:
+    return JSONResponse(
+        {"status": "healthy", "server": "neo4j-cypher", "transport": "streamable-http"}
+    )
 
 
-app.mount("/mcp", mcp_app)
+app = Starlette(
+    routes=[
+        Route("/", landing, methods=["GET"]),
+        Route("/health", health, methods=["GET"]),
+        # Catch-all mount so /mcp (and any trailing-slash variant) reach FastMCP.
+        Mount("/", app=mcp_app),
+    ],
+    lifespan=mcp_app.lifespan,
+)
