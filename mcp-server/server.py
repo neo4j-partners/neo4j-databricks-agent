@@ -3,10 +3,11 @@
 Surface:
 - GET  /         -> HTML landing page (server identity, tool catalog, sample request)
 - GET  /health   -> 200 JSON, for the Databricks Apps health probe
-- POST /mcp      -> MCP Streamable HTTP transport (FastMCP)
+- POST /mcp/mcp  -> MCP Streamable HTTP transport (FastMCP)
 
-The Databricks Apps MCP registry convention is `{app_url}/mcp`, so the MCP
-endpoint lives at the root path `/mcp` (not `/mcp/<something>`).
+The Databricks Apps MCP integration treats the app URL as the *base*
+`{app_url}/mcp` and then appends `/mcp` again as the protocol path, so the
+canonical endpoint a Databricks-hosted client hits is `{app_url}/mcp/mcp`.
 
 The MCP layer exposes two read-only tools backed by a single Neo4j Aura
 instance read from the standard NEO4J_* environment variables (mapped from
@@ -199,10 +200,11 @@ def read_neo4j_cypher(
 
 
 # ---------------------------------------------------------------------------
-# Starlette parent: landing on /, health on /health, MCP at /mcp.
-# The Databricks Apps MCP registry hits {app_url}/mcp, so the FastMCP ASGI
-# app is configured to serve its endpoint at path="/mcp" and then mounted
-# at the Starlette root.
+# Starlette parent: landing on /, health on /health, MCP at /mcp/mcp.
+# The Databricks Apps MCP integration registers the app's URL as the MCP
+# server base, then appends "/mcp" to construct the protocol endpoint —
+# so we mount FastMCP (whose internal path is "/mcp") under "/mcp", giving
+# the canonical URL "/mcp/mcp".
 # ---------------------------------------------------------------------------
 
 mcp_app = mcp.http_app(path="/mcp")
@@ -223,8 +225,9 @@ app = Starlette(
     routes=[
         Route("/", landing, methods=["GET"]),
         Route("/health", health, methods=["GET"]),
-        # Catch-all mount so /mcp (and any trailing-slash variant) reach FastMCP.
-        Mount("/", app=mcp_app),
+        # Mount FastMCP at /mcp; with internal path "/mcp" the external URL
+        # is /mcp/mcp, which matches Databricks Apps' MCP registry behavior.
+        Mount("/mcp", app=mcp_app),
     ],
     lifespan=mcp_app.lifespan,
 )
